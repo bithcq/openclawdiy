@@ -60,6 +60,18 @@ bash <(curl -fsSL https://raw.githubusercontent.com/bithcq/openclawdiy/main/inst
 
 跑完后，补充 `~/.openclaw/.env` 里的企业微信配置即可。
 
+如果你想完全不依赖官方安装器，也可以直接一条命令完成“官方 Git 底座 + DIY”：
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/bithcq/openclawdiy/main/bootstrap.sh)
+```
+
+如果你只想先装最适合 DIY 的官方底座，再晚点套 DIY，也可以用：
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/bithcq/openclawdiy/main/install-openclaw-base.sh)
+```
+
 如果是独立仓库，用下面这些命令：
 
 首次安装：

@@ -18,6 +18,7 @@ copy_overlay "$TARGET_DIR"
 apply_patch_set "$TARGET_DIR"
 persist_wecom_env
 build_target "$TARGET_DIR"
+warn_if_wecom_voice_deps_missing "$TARGET_DIR"
 configure_target_runtime "$TARGET_DIR"
 install_or_restart_gateway_service "$TARGET_DIR"
 print_final_status "$TARGET_DIR"

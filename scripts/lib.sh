@@ -5,6 +5,7 @@ DIY_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEFAULT_TARGET_DIR="${OPENCLAW_TARGET_DIR:-$HOME/openclaw}"
 OFFICIAL_REMOTE_NAME="${OPENCLAW_OFFICIAL_REMOTE_NAME:-origin}"
 OFFICIAL_REMOTE_URL="${OPENCLAW_OFFICIAL_REMOTE_URL:-https://github.com/openclaw/openclaw.git}"
+REQUIRED_NODE_MAJOR="${OPENCLAW_DIY_NODE_MAJOR:-22}"
 
 info() {
   printf '[openclaw-diy] %s\n' "$*"
@@ -21,6 +22,96 @@ die() {
 
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || die "缺少命令：$1"
+}
+
+detect_linux_distro() {
+  if [[ -r /etc/os-release ]]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    printf '%s\n' "${ID:-unknown}"
+    return
+  fi
+  printf 'unknown\n'
+}
+
+ensure_apt_package() {
+  local pkg="$1"
+  dpkg -s "$pkg" >/dev/null 2>&1 || sudo apt-get install -y "$pkg"
+}
+
+ensure_system_prereqs() {
+  local distro
+  distro="$(detect_linux_distro)"
+  case "$distro" in
+    ubuntu|debian)
+      ;;
+    *)
+      warn "当前发行版不是 Debian/Ubuntu；脚本按 Debian 系路径继续。"
+      ;;
+  esac
+
+  if ! command -v sudo >/dev/null 2>&1; then
+    die "缺少 sudo；一键安装脚本需要 sudo 安装系统依赖。"
+  fi
+
+  local missing=0
+  for cmd in git curl node; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      missing=1
+      break
+    fi
+  done
+  if [[ "$missing" == "1" ]] || ! command -v corepack >/dev/null 2>&1; then
+    info "安装系统依赖"
+    sudo apt-get update
+  fi
+
+  ensure_apt_package git
+  ensure_apt_package curl
+  ensure_apt_package ca-certificates
+  ensure_apt_package gnupg
+  ensure_apt_package build-essential
+  ensure_apt_package python3
+}
+
+ensure_node_runtime() {
+  local need_install=0
+  if ! command -v node >/dev/null 2>&1; then
+    need_install=1
+  else
+    local major
+    major="$(node -v 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/')"
+    if [[ -z "$major" || "$major" -lt "$REQUIRED_NODE_MAJOR" ]]; then
+      need_install=1
+    fi
+  fi
+
+  if [[ "$need_install" == "1" ]]; then
+    info "安装 Node.js ${REQUIRED_NODE_MAJOR}+"
+    curl -fsSL "https://deb.nodesource.com/setup_${REQUIRED_NODE_MAJOR}.x" | sudo -E bash -
+    sudo apt-get install -y nodejs
+  fi
+
+  info "当前 Node.js: $(node -v)"
+}
+
+ensure_pnpm() {
+  if command -v pnpm >/dev/null 2>&1; then
+    info "当前 pnpm: $(pnpm -v)"
+    return
+  fi
+
+  if command -v corepack >/dev/null 2>&1; then
+    info "通过 corepack 启用 pnpm"
+    corepack enable
+    corepack prepare pnpm@latest --activate
+  else
+    info "通过 npm 安装 pnpm"
+    sudo npm install -g pnpm
+  fi
+
+  command -v pnpm >/dev/null 2>&1 || die "pnpm 安装失败"
+  info "当前 pnpm: $(pnpm -v)"
 }
 
 resolve_target_dir() {
@@ -102,7 +193,10 @@ build_target() {
   pnpm -C "$target_dir" ui:build
   info "构建 OpenClaw"
   pnpm -C "$target_dir" build
+}
 
+warn_if_wecom_voice_deps_missing() {
+  local target_dir="$1"
   # WeCom 语音依赖 ffmpeg-static；某些 pnpm 环境会默认跳过 build scripts，
   # 这里提前给出明确提示，避免首次发语音时才暴露问题。
   if ! (cd "$target_dir" && node --input-type=module -e 'import ffmpegPath from "ffmpeg-static"; if (!ffmpegPath) process.exit(1)'); then
@@ -181,6 +275,53 @@ run_claw() {
   OPENCLAW_STATE_DIR="$state_dir" \
   OPENCLAW_CONFIG_PATH="$config_path" \
     node "$target_dir/dist/index.js" "$@"
+}
+
+install_cli_wrapper() {
+  local target_dir="$1"
+  local bin_dir="${OPENCLAW_DIY_BIN_DIR:-$HOME/.local/bin}"
+  local wrapper_path="$bin_dir/openclaw"
+  local preferred_node
+  preferred_node="$(command -v node)"
+
+  if [[ "${OPENCLAW_DIY_SKIP_PATH:-0}" == "1" ]]; then
+    warn "OPENCLAW_DIY_SKIP_PATH=1，跳过 PATH 入口安装"
+    return
+  fi
+
+  mkdir -p "$bin_dir"
+  cat >"$wrapper_path" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+
+OPENCLAW_ROOT="${target_dir}"
+OPENCLAW_CLI="\${OPENCLAW_ROOT}/dist/index.js"
+PREFERRED_NODE="${preferred_node}"
+
+if [ -x "\${PREFERRED_NODE}" ]; then
+  exec "\${PREFERRED_NODE}" "\${OPENCLAW_CLI}" "\$@"
+fi
+
+for candidate in \
+  /usr/bin/node \
+  /usr/local/bin/node \
+  "\$HOME/.nvm/versions/node"/*/bin/node \
+  "\$HOME/.volta/bin/node"
+do
+  if [ -x "\$candidate" ]; then
+    exec "\$candidate" "\${OPENCLAW_CLI}" "\$@"
+  fi
+done
+
+if command -v node >/dev/null 2>&1; then
+  exec "\$(command -v node)" "\${OPENCLAW_CLI}" "\$@"
+fi
+
+echo "openclaw: node not found" >&2
+exit 127
+EOF
+  chmod +x "$wrapper_path"
+  info "已安装 CLI 入口：$wrapper_path"
 }
 
 configure_target_runtime() {
