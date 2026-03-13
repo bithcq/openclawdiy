@@ -42,6 +42,24 @@
 - 作为当前仓库里的 `diy/` 子目录使用
 - 也可以单独拆成 `openclaw-diy` 仓库直接使用
 
+## 推荐安装顺序
+
+新电脑建议直接按下面两步走：
+
+1. 先用官方一键安装底座
+
+```bash
+curl -fsSL https://openclaw.ai/install.sh | bash
+```
+
+2. 再运行 DIY 一键安装
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/bithcq/openclawdiy/main/install.sh)
+```
+
+跑完后，补充 `~/.openclaw/.env` 里的企业微信配置即可。
+
 如果是独立仓库，用下面这些命令：
 
 首次安装：
@@ -54,6 +72,12 @@ bash scripts/install-diy.sh
 
 ```bash
 bash scripts/update-diy.sh
+```
+
+也可以直接远程一键更新：
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/bithcq/openclawdiy/main/update.sh)
 ```
 
 默认目标目录是 `~/openclaw`，也可以自己指定：
@@ -113,6 +137,8 @@ DIY_ENV_FILE=/path/to/wecom.env bash scripts/install-diy.sh
 模板见：
 
 - `templates/wecom.env.example`
+
+如果当前 shell 没有 `WECOM_*`，脚本会在 `~/.openclaw/.env` 不存在时自动生成模板文件，方便你直接补充。
 
 ## 语音依赖说明
 

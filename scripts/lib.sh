@@ -133,6 +133,7 @@ upsert_env_var() {
 persist_wecom_env() {
   local state_dir="${OPENCLAW_STATE_DIR:-$HOME/.openclaw}"
   local env_file="$state_dir/.env"
+  local template_file="$DIY_ROOT/templates/wecom.env.example"
   mkdir -p "$state_dir"
 
   if [[ -n "${DIY_ENV_FILE:-}" ]]; then
@@ -152,6 +153,11 @@ persist_wecom_env() {
   if [[ "$found" == "1" ]]; then
     info "已把当前 shell 中的 WECOM_* 写入 $env_file"
   else
+    if [[ ! -f "$env_file" && -f "$template_file" ]]; then
+      cp "$template_file" "$env_file"
+      warn "未检测到 WECOM_*；已生成模板文件 $env_file，请补充企业微信配置。"
+      return
+    fi
     warn "当前 shell 未发现 WECOM_*；跳过写入 $env_file"
   fi
 }
