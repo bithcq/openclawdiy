@@ -179,9 +179,11 @@ run_claw() {
 
 configure_target_runtime() {
   local target_dir="$1"
+  local gateway_bind="${OPENCLAW_DIY_GATEWAY_BIND:-lan}"
 
   info "写入本地运行配置"
   run_claw "$target_dir" config set gateway.mode local
+  run_claw "$target_dir" config set gateway.bind "$gateway_bind"
   run_claw "$target_dir" config set session.dmScope main
   run_claw "$target_dir" config set tools.profile full
   run_claw "$target_dir" config set tools.exec.applyPatch.enabled true

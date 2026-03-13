@@ -16,6 +16,7 @@
 另外，脚本会顺手写入本地运行配置：
 
 - `gateway.mode=local`
+- `gateway.bind=lan`
 - `session.dmScope=main`
 - `tools.profile=full`
 - `tools.exec.applyPatch.enabled=true`
@@ -95,6 +96,12 @@ OPENCLAW_STATE_DIR=/path/to/state bash scripts/install-diy.sh
 
 ```bash
 OPENCLAW_CONFIG_PATH=/path/to/openclaw.json bash scripts/install-diy.sh
+```
+
+如果你要覆盖默认的网关绑定方式，也支持：
+
+```bash
+OPENCLAW_DIY_GATEWAY_BIND=loopback bash scripts/install-diy.sh
 ```
 
 也可以显式指定一个 env 文件：
