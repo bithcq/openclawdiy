@@ -42,68 +42,83 @@
 - 作为当前仓库里的 `diy/` 子目录使用
 - 也可以单独拆成 `openclaw-diy` 仓库直接使用
 
-## 推荐安装顺序
+## 推荐入口
 
-新电脑建议直接按下面两步走：
+你现在主要只需要记住两个脚本：
 
-1. 先用官方一键安装底座
+### 1. 新电脑一键安装
+
+适用于：
+
+- 新电脑
+- 还没安装 OpenClaw
+- 想一条命令完成“官方底座 + DIY”
 
 ```bash
-curl -fsSL https://openclaw.ai/install.sh | bash
+bash <(curl -fsSL https://raw.githubusercontent.com/bithcq/openclawdiy/main/install-new.sh)
 ```
 
-2. 再运行 DIY 一键安装
+### 2. 官方 OpenClaw 已装好，或刚更新完官方后重新套 DIY
+
+适用于：
+
+- 已经有 `~/openclaw`
+- 刚跑过官方更新
+- 只想重新安装 DIY 层
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/bithcq/openclawdiy/main/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/bithcq/openclawdiy/main/install-diy.sh)
 ```
 
 跑完后，补充 `~/.openclaw/.env` 里的企业微信配置即可。
 
-如果你想完全不依赖官方安装器，也可以直接一条命令完成“官方 Git 底座 + DIY”：
+## 兼容入口
+
+下面这些入口仍然保留，方便兼容旧习惯：
+
+- `bootstrap.sh`
+  - 等价于 `install-new.sh`
+- `install.sh`
+  - 等价于 `install-diy.sh`
+- `update.sh`
+  - 对已存在的官方仓库重新拉最新后套 DIY
+- `install-openclaw-base.sh`
+  - 只安装最适合 DIY 的官方 Git 底座
+
+如果是独立仓库手动运行，也可以：
+
+新电脑从零开始：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/bithcq/openclawdiy/main/bootstrap.sh)
+bash install-new.sh
 ```
 
-如果你只想先装最适合 DIY 的官方底座，再晚点套 DIY，也可以用：
+已装官方版后套 DIY：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/bithcq/openclawdiy/main/install-openclaw-base.sh)
+bash install-diy.sh
 ```
 
-如果是独立仓库，用下面这些命令：
-
-首次安装：
+官方更新后重新套 DIY：
 
 ```bash
-bash scripts/install-diy.sh
-```
-
-更新官方并重新套用：
-
-```bash
-bash scripts/update-diy.sh
-```
-
-也可以直接远程一键更新：
-
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/bithcq/openclawdiy/main/update.sh)
+bash update.sh
 ```
 
 默认目标目录是 `~/openclaw`，也可以自己指定：
 
 ```bash
-bash scripts/install-diy.sh /path/to/openclaw
-bash scripts/update-diy.sh /path/to/openclaw
+bash install-new.sh /path/to/openclaw
+bash install-diy.sh /path/to/openclaw
+bash update.sh /path/to/openclaw
 ```
 
 如果你当前就是在 OpenClaw 主仓里直接运行，则把命令前缀改成 `diy/`：
 
 ```bash
-bash diy/scripts/install-diy.sh
-bash diy/scripts/update-diy.sh
+bash diy/install-new.sh
+bash diy/install-diy.sh
+bash diy/update.sh
 ```
 
 脚本默认把目标官方仓库当作“可重建目录”处理：
