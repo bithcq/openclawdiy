@@ -21,6 +21,8 @@
 - `tools.profile=full`
 - `tools.exec.applyPatch.enabled=true`
 - `plugins.entries.wecom.enabled=true`
+- `channels.wecom.dmPolicy=open`
+- `channels.wecom.allowFrom=["*"]`
 
 ## 目录说明
 

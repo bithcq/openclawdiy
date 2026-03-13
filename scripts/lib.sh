@@ -350,6 +350,8 @@ configure_target_runtime() {
   run_claw "$target_dir" config set tools.profile full
   run_claw "$target_dir" config set tools.exec.applyPatch.enabled true
   run_claw "$target_dir" config set plugins.entries.wecom.enabled true
+  run_claw "$target_dir" config set channels.wecom.dmPolicy open
+  run_claw "$target_dir" config set channels.wecom.allowFrom '["*"]' --strict-json
 }
 
 install_or_restart_gateway_service() {
