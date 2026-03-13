@@ -1,0 +1,110 @@
+diff --git a/src/agents/pi-embedded-runner/compact.ts b/src/agents/pi-embedded-runner/compact.ts
+index 1207a0c3b0..b52859c803 100644
+--- a/src/agents/pi-embedded-runner/compact.ts
++++ b/src/agents/pi-embedded-runner/compact.ts
+@@ -84,6 +84,11 @@ import { getDmHistoryLimitFromSessionKey, limitHistoryTurns } from "./history.js
+ import { resolveGlobalLane, resolveSessionLane } from "./lanes.js";
+ import { log } from "./logger.js";
+ import { buildModelAliasLines, resolveModel } from "./model.js";
++import {
++  filterLocalWebSearchTools,
++  shouldUseNativeWebSearchForBaseUrl,
++  wrapStreamFnWithNativeWebSearch,
++} from "./native-web-search.js";
+ import { buildEmbeddedSandboxInfo } from "./sandbox-info.js";
+ import { prewarmSessionFile, trackSessionManagerAccess } from "./session-manager-cache.js";
+ import { resolveEmbeddedRunSkillEntries } from "./skills-runtime.js";
+@@ -548,8 +553,14 @@ export async function compactEmbeddedPiSessionDirect(
+       modelContextWindowTokens: ctxInfo.tokens,
+       modelAuthMode: resolveModelAuthMode(model.provider, params.config),
+     });
++    const useNativeWebSearchForBaseUrl = shouldUseNativeWebSearchForBaseUrl({
++      model,
++    });
++    const toolsForRun = useNativeWebSearchForBaseUrl
++      ? filterLocalWebSearchTools(toolsRaw)
++      : toolsRaw;
+     const tools = sanitizeToolsForGoogle({
+-      tools: supportsModelTools(model) ? toolsRaw : [],
++      tools: supportsModelTools(model) ? toolsForRun : [],
+       provider,
+     });
+     const allowedToolNames = collectAllowedToolNames({ tools });
+@@ -670,7 +681,9 @@ export async function compactEmbeddedPiSessionDirect(
+       reactionGuidance,
+       messageToolHints,
+       sandboxInfo,
+-      tools,
++      tools: useNativeWebSearchForBaseUrl
++        ? [...tools, { name: "web_search" } as (typeof tools)[number]]
++        : tools,
+       modelAliasLines: buildModelAliasLines(params.config),
+       userTimezone,
+       userTime,
+@@ -750,6 +763,9 @@ export async function compactEmbeddedPiSessionDirect(
+         resourceLoader,
+       });
+       applySystemPromptOverrideToSession(session, systemPromptOverride());
++      if (useNativeWebSearchForBaseUrl) {
++        session.agent.streamFn = wrapStreamFnWithNativeWebSearch(session.agent.streamFn);
++      }
+       if (model.api === "ollama") {
+         const providerBaseUrl =
+           typeof params.config?.models?.providers?.[model.provider]?.baseUrl === "string"
+diff --git a/src/agents/pi-embedded-runner/run/attempt.ts b/src/agents/pi-embedded-runner/run/attempt.ts
+index 3457fdf016..c5ff5cc5a2 100644
+--- a/src/agents/pi-embedded-runner/run/attempt.ts
++++ b/src/agents/pi-embedded-runner/run/attempt.ts
+@@ -107,6 +107,11 @@ import {
+ import { getDmHistoryLimitFromSessionKey, limitHistoryTurns } from "../history.js";
+ import { log } from "../logger.js";
+ import { buildModelAliasLines } from "../model.js";
++import {
++  filterLocalWebSearchTools,
++  shouldUseNativeWebSearchForBaseUrl,
++  wrapStreamFnWithNativeWebSearch,
++} from "../native-web-search.js";
+ import {
+   clearActiveEmbeddedRun,
+   type EmbeddedPiQueueHandle,
+@@ -1529,9 +1534,15 @@ export async function runEmbeddedAttempt(
+             abortSessionForYield?.();
+           },
+         });
++    const useNativeWebSearchForBaseUrl = shouldUseNativeWebSearchForBaseUrl({
++      model: params.model,
++    });
++    const toolsForRun = useNativeWebSearchForBaseUrl
++      ? filterLocalWebSearchTools(toolsRaw)
++      : toolsRaw;
+     const toolsEnabled = supportsModelTools(params.model);
+     const tools = sanitizeToolsForGoogle({
+-      tools: toolsEnabled ? toolsRaw : [],
++      tools: toolsEnabled ? toolsForRun : [],
+       provider: params.provider,
+     });
+     const clientTools = toolsEnabled ? params.clientTools : undefined;
+@@ -1661,7 +1672,9 @@ export async function runEmbeddedAttempt(
+       runtimeInfo,
+       messageToolHints,
+       sandboxInfo,
+-      tools,
++      tools: useNativeWebSearchForBaseUrl
++        ? [...tools, { name: "web_search" } as (typeof tools)[number]]
++        : tools,
+       modelAliasLines: buildModelAliasLines(params.config),
+       userTimezone,
+       userTime,
+@@ -2059,6 +2072,12 @@ export async function runEmbeddedAttempt(
+         );
+       }
+ 
++      if (useNativeWebSearchForBaseUrl) {
++        activeSession.agent.streamFn = wrapStreamFnWithNativeWebSearch(
++          activeSession.agent.streamFn,
++        );
++      }
++
+       try {
+         const prior = await sanitizeSessionHistory({
+           messages: activeSession.messages,
