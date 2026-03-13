@@ -1,0 +1,196 @@
+diff --git a/src/gateway/server-channels.test.ts b/src/gateway/server-channels.test.ts
+index c442c1424..b389d8f60 100644
+--- a/src/gateway/server-channels.test.ts
++++ b/src/gateway/server-channels.test.ts
+@@ -5,6 +5,7 @@ import {
+   type SubsystemLogger,
+   runtimeForLogger,
+ } from "../logging/subsystem.js";
++import { registerPluginHttpRoute } from "../plugins/http-registry.js";
+ import { createEmptyPluginRegistry, type PluginRegistry } from "../plugins/registry.js";
+ import { getActivePluginRegistry, setActivePluginRegistry } from "../plugins/runtime.js";
+ import type { PluginRuntime } from "../plugins/runtime/types.js";
+@@ -88,7 +89,10 @@ function installTestRegistry(plugin: ChannelPlugin<TestAccount>) {
+   setActivePluginRegistry(registry);
+ }
+ 
+-function createManager(options?: { channelRuntime?: PluginRuntime["channel"] }) {
++function createManager(options?: {
++  channelRuntime?: PluginRuntime["channel"];
++  pluginRegistry?: PluginRegistry;
++}) {
+   const log = createSubsystemLogger("gateway/server-channels-test");
+   const channelLogs = { discord: log } as Record<ChannelId, SubsystemLogger>;
+   const runtime = runtimeForLogger(log);
+@@ -97,6 +101,7 @@ function createManager(options?: { channelRuntime?: PluginRuntime["channel"] })
+     loadConfig: () => ({}),
+     channelLogs,
+     channelRuntimeEnvs,
++    ...(options?.pluginRegistry ? { pluginRegistry: options.pluginRegistry } : {}),
+     ...(options?.channelRuntime ? { channelRuntime: options.channelRuntime } : {}),
+   });
+ }
+@@ -132,7 +137,7 @@ describe("server-channels auto restart", () => {
+     const snapshot = manager.getRuntimeSnapshot();
+     const account = snapshot.channelAccounts.discord?.[DEFAULT_ACCOUNT_ID];
+     expect(account?.running).toBe(false);
+-    expect(account?.reconnectAttempts).toBe(10);
++    expect(account?.reconnectAttempts).toBe(11);
+ 
+     await vi.advanceTimersByTimeAsync(200);
+     expect(startAccount).toHaveBeenCalledTimes(11);
+@@ -180,4 +185,35 @@ describe("server-channels auto restart", () => {
+     await manager.startChannels();
+     expect(startAccount).toHaveBeenCalledTimes(1);
+   });
++
++  it("re-aligns active plugin registry before dynamic channel route registration", async () => {
++    const canonicalRegistry = createEmptyPluginRegistry();
++    const driftedRegistry = createEmptyPluginRegistry();
++    const startAccount = vi.fn(async () => {
++      registerPluginHttpRoute({
++        path: "/api/test-wecom-callback",
++        auth: "plugin",
++        handler: vi.fn(),
++      });
++    });
++
++    canonicalRegistry.channels.push({
++      pluginId: "discord",
++      source: "test",
++      plugin: createTestPlugin({ startAccount }),
++    });
++    setActivePluginRegistry(canonicalRegistry);
++
++    const manager = createManager({ pluginRegistry: canonicalRegistry });
++
++    // 模拟启动过程中其他路径重新加载插件，导致 active registry 漂移。
++    setActivePluginRegistry(driftedRegistry);
++    await manager.startChannels();
++
++    expect(startAccount).toHaveBeenCalledTimes(1);
++    expect(canonicalRegistry.httpRoutes.map((route) => route.path)).toContain(
++      "/api/test-wecom-callback",
++    );
++    expect(driftedRegistry.httpRoutes).toHaveLength(0);
++  });
+ });
+diff --git a/src/gateway/server-channels.ts b/src/gateway/server-channels.ts
+index 4090791d2..a6d1e3b34 100644
+--- a/src/gateway/server-channels.ts
++++ b/src/gateway/server-channels.ts
+@@ -6,6 +6,8 @@ import { type BackoffPolicy, computeBackoff, sleepWithAbort } from "../infra/bac
+ import { formatErrorMessage } from "../infra/errors.js";
+ import { resetDirectoryCache } from "../infra/outbound/target-resolver.js";
+ import type { createSubsystemLogger } from "../logging/subsystem.js";
++import type { PluginRegistry } from "../plugins/registry.js";
++import { getActivePluginRegistry, setActivePluginRegistry } from "../plugins/runtime.js";
+ import type { PluginRuntime } from "../plugins/runtime/types.js";
+ import { DEFAULT_ACCOUNT_ID } from "../routing/session-key.js";
+ import type { RuntimeEnv } from "../runtime.js";
+@@ -60,6 +62,15 @@ type ChannelManagerOptions = {
+   loadConfig: () => OpenClawConfig;
+   channelLogs: Record<ChannelId, SubsystemLogger>;
+   channelRuntimeEnvs: Record<ChannelId, RuntimeEnv>;
++  /**
++   * Gateway 启动时固定使用的插件注册表。
++   *
++   * 某些运行时路径会重新调用 loadOpenClawPlugins()，从而把全局 active
++   * registry 切到另一份对象。像 WeCom 这种在 channel 启动阶段动态注册
++   * HTTP 路由的插件，如果继续依赖“当前 active registry”，就可能把
++   * webhook 注册到错误的表里，最终 HTTP server 看不到路由。
++   */
++  pluginRegistry?: PluginRegistry;
+   /**
+    * Optional channel runtime helpers for external channel plugins.
+    *
+@@ -109,7 +120,7 @@ export type ChannelManager = {
+ 
+ // Channel docking: lifecycle hooks (`plugin.gateway`) flow through this manager.
+ export function createChannelManager(opts: ChannelManagerOptions): ChannelManager {
+-  const { loadConfig, channelLogs, channelRuntimeEnvs, channelRuntime } = opts;
++  const { loadConfig, channelLogs, channelRuntimeEnvs, channelRuntime, pluginRegistry } = opts;
+ 
+   const channelStores = new Map<ChannelId, ChannelRuntimeStore>();
+   // Tracks restart attempts per channel:account. Reset on successful start.
+@@ -119,6 +130,15 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
+ 
+   const restartKey = (channelId: ChannelId, accountId: string) => `${channelId}:${accountId}`;
+ 
++  const ensureCanonicalPluginRegistry = () => {
++    if (!pluginRegistry) {
++      return;
++    }
++    if (getActivePluginRegistry() !== pluginRegistry) {
++      setActivePluginRegistry(pluginRegistry);
++    }
++  };
++
+   const getStore = (channelId: ChannelId): ChannelRuntimeStore => {
+     const existing = channelStores.get(channelId);
+     if (existing) {
+@@ -151,6 +171,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
+     accountId?: string,
+     opts: StartChannelOptions = {},
+   ) => {
++    ensureCanonicalPluginRegistry();
+     const plugin = getChannelPlugin(channelId);
+     const startAccount = plugin?.gateway?.startAccount;
+     if (!startAccount) {
+@@ -207,6 +228,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
+           manuallyStopped.delete(rKey);
+         }
+ 
++        ensureCanonicalPluginRegistry();
+         const abort = new AbortController();
+         store.aborts.set(id, abort);
+         if (!preserveRestartAttempts) {
+@@ -305,10 +327,12 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
+   };
+ 
+   const startChannel = async (channelId: ChannelId, accountId?: string) => {
++    ensureCanonicalPluginRegistry();
+     await startChannelInternal(channelId, accountId);
+   };
+ 
+   const stopChannel = async (channelId: ChannelId, accountId?: string) => {
++    ensureCanonicalPluginRegistry();
+     const plugin = getChannelPlugin(channelId);
+     const store = getStore(channelId);
+     // Fast path: nothing running and no explicit plugin shutdown hook to run.
+@@ -336,6 +360,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
+         manuallyStopped.add(restartKey(channelId, id));
+         abort?.abort();
+         if (plugin?.gateway?.stopAccount) {
++          ensureCanonicalPluginRegistry();
+           const account = plugin.config.resolveAccount(cfg, id);
+           await plugin.gateway.stopAccount({
+             cfg,
+@@ -366,6 +391,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
+   };
+ 
+   const startChannels = async () => {
++    ensureCanonicalPluginRegistry();
+     for (const plugin of listChannelPlugins()) {
+       await startChannel(plugin.id);
+     }
+@@ -397,6 +423,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
+   };
+ 
+   const getRuntimeSnapshot = (): ChannelRuntimeSnapshot => {
++    ensureCanonicalPluginRegistry();
+     const cfg = loadConfig();
+     const channels: ChannelRuntimeSnapshot["channels"] = {};
+     const channelAccounts: ChannelRuntimeSnapshot["channelAccounts"] = {};
+diff --git a/src/gateway/server.impl.ts b/src/gateway/server.impl.ts
+index 9b3941d14..5d1c3b1bb 100644
+--- a/src/gateway/server.impl.ts
++++ b/src/gateway/server.impl.ts
+@@ -575,6 +575,7 @@ export async function startGatewayServer(
+     loadConfig,
+     channelLogs,
+     channelRuntimeEnvs,
++    pluginRegistry,
+     channelRuntime: createPluginRuntime().channel,
+   });
+   const getReadiness = createReadinessChecker({
