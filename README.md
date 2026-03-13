@@ -169,9 +169,12 @@ DIY_ENV_FILE=/path/to/wecom.env bash scripts/install-diy.sh
 
 ## 语音依赖说明
 
-WeCom 语音转写依赖 `ffmpeg-static`。
+WeCom 语音转写现在支持两条路径：
 
-有些 `pnpm` 环境会默认跳过依赖的 build scripts。脚本已经会给出告警，但如果你首次安装后语音仍不可用，优先在目标官方仓库里执行：
+- 优先使用 `ffmpeg-static`
+- 如果 `ffmpeg-static` 因为 `pnpm` 跳过 build scripts 没拉到二进制，会自动回退到系统 `ffmpeg`
+
+DIY 安装脚本默认会尝试安装系统 `ffmpeg`。如果你首次安装后语音仍不可用，优先在目标官方仓库里执行：
 
 ```bash
 pnpm approve-builds

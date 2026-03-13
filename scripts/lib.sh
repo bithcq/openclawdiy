@@ -72,6 +72,7 @@ ensure_system_prereqs() {
   ensure_apt_package gnupg
   ensure_apt_package build-essential
   ensure_apt_package python3
+  ensure_apt_package ffmpeg
 }
 
 ensure_node_runtime() {
@@ -197,12 +198,26 @@ build_target() {
 
 warn_if_wecom_voice_deps_missing() {
   local target_dir="$1"
-  # WeCom 语音依赖 ffmpeg-static；某些 pnpm 环境会默认跳过 build scripts，
-  # 这里提前给出明确提示，避免首次发语音时才暴露问题。
-  if ! (cd "$target_dir" && node --input-type=module -e 'import ffmpegPath from "ffmpeg-static"; if (!ffmpegPath) process.exit(1)'); then
-    warn "ffmpeg-static 当前不可用；WeCom 语音转写可能失败。"
-    warn "如果是 pnpm 跳过 build scripts，请在目标仓库执行：pnpm approve-builds"
+  # WeCom 语音转写允许两条路径：
+  # 1. ffmpeg-static 二进制存在且可执行
+  # 2. 系统 ffmpeg 在 PATH 中可用
+  # 只要满足其中一条，就不再报警。
+  if command -v ffmpeg >/dev/null 2>&1; then
+    info "检测到系统 ffmpeg：$(command -v ffmpeg)"
+    return
   fi
+
+  if (
+    cd "$target_dir/extensions/wecom" &&
+      node --input-type=module -e 'import fs from "node:fs"; import ffmpegPath from "ffmpeg-static"; process.exit(typeof ffmpegPath === "string" && fs.existsSync(ffmpegPath) ? 0 : 1)'
+  ); then
+    info "检测到 ffmpeg-static 二进制"
+    return
+  fi
+
+  warn "未检测到可用的 ffmpeg；WeCom 语音转写会失败。"
+  warn "如果是 pnpm 跳过 build scripts，请在目标仓库执行：pnpm approve-builds，并允许 ffmpeg-static。"
+  warn "或者直接安装系统 ffmpeg（DIY 脚本默认会尝试安装）。"
 }
 
 upsert_env_var() {

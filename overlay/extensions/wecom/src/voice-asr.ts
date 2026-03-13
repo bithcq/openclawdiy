@@ -6,6 +6,7 @@
 
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { constants as fsConstants } from "node:fs";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -210,23 +211,33 @@ function resolveTempExtension(format: string): string {
   return `.${normalized}`;
 }
 
+async function resolveFfmpegExecutable(): Promise<string> {
+  if (typeof ffmpegPath === "string" && ffmpegPath.trim()) {
+    try {
+      await fs.access(ffmpegPath, fsConstants.X_OK);
+      return ffmpegPath;
+    } catch {
+      // pnpm 跳过 build scripts 时，ffmpeg-static 可能只有 JS 包装层，没有真正二进制。
+      // 这里回退到系统 ffmpeg，避免 WeCom 语音功能整体不可用。
+    }
+  }
+  return "ffmpeg";
+}
+
 async function transcodeToPcm16kMono(params: {
   audioBuffer: Buffer;
   format: string;
 }): Promise<Buffer> {
-  if (!ffmpegPath) {
-    throw new Error("ffmpeg-static is unavailable");
-  }
-
   const { audioBuffer, format } = params;
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-wecom-asr-"));
   const inputPath = path.join(tempDir, `input${resolveTempExtension(format)}`);
   const outputPath = path.join(tempDir, "output.pcm");
+  const ffmpegExecutable = await resolveFfmpegExecutable();
 
   try {
     await fs.writeFile(inputPath, audioBuffer);
     await execFileAsync(
-      ffmpegPath,
+      ffmpegExecutable,
       [
         "-y",
         "-i",
@@ -248,6 +259,16 @@ async function transcodeToPcm16kMono(params: {
     );
     return await fs.readFile(outputPath);
   } catch (error) {
+    if (
+      typeof error === "object" &&
+      error &&
+      "code" in error &&
+      (error as { code?: string }).code === "ENOENT"
+    ) {
+      throw new Error(
+        `AMR 转码失败：系统中找不到可用的 ffmpeg（已尝试 ${ffmpegExecutable}）`,
+      );
+    }
     throw new Error(`AMR 转码失败：${String(error)}`);
   } finally {
     await fs.rm(tempDir, { recursive: true, force: true });
@@ -536,3 +557,7 @@ export async function transcribeVoiceBuffer(params: {
     });
   });
 }
+
+export const __testing = {
+  resolveFfmpegExecutable,
+};
