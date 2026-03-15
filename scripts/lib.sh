@@ -321,6 +321,8 @@ install_cli_wrapper() {
   local target_dir="$1"
   local bin_dir="${OPENCLAW_DIY_BIN_DIR:-$HOME/.local/bin}"
   local wrapper_path="$bin_dir/openclaw"
+  local system_bin_dir="${OPENCLAW_DIY_SYSTEM_BIN_DIR:-/usr/local/bin}"
+  local system_wrapper_path="$system_bin_dir/openclaw"
   local preferred_node
   preferred_node="$(command -v node)"
 
@@ -362,6 +364,18 @@ exit 127
 EOF
   chmod +x "$wrapper_path"
   info "已安装 CLI 入口：$wrapper_path"
+
+  if [[ "$system_wrapper_path" != "$wrapper_path" ]]; then
+    if [[ -w "$system_bin_dir" ]]; then
+      install -m 755 "$wrapper_path" "$system_wrapper_path"
+      info "已安装系统 CLI 入口：$system_wrapper_path"
+    elif command -v sudo >/dev/null 2>&1; then
+      sudo install -m 755 "$wrapper_path" "$system_wrapper_path"
+      info "已安装系统 CLI 入口：$system_wrapper_path"
+    else
+      warn "无法写入 $system_wrapper_path；当前 shell 可能仍需手动把 $bin_dir 加入 PATH。"
+    fi
+  fi
 }
 
 configure_target_runtime() {

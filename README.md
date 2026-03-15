@@ -70,6 +70,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/bithcq/openclawdiy/main/inst
 说明：
 
 - 如果当前机器的 Node.js 是系统级安装，脚本会在 `corepack` 默认目录不可写时自动把 `pnpm` shim 安装到 `~/.local/bin`
+- CLI 会同时安装到 `~/.local/bin/openclaw` 和 `/usr/local/bin/openclaw`，优先保证新 shell 可直接执行 `openclaw`
 - 安装流程里会自动补当前 shell 的 `PATH`；如果你后续手动执行 `pnpm` 仍提示找不到命令，请把 `~/.local/bin` 加到自己的 shell `PATH`
 
 ### 2. 官方 OpenClaw 已装好，或刚更新完官方后重新套 DIY

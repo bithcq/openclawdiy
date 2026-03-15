@@ -32,7 +32,14 @@
 - 回退时必须在当前脚本进程内补 `PATH`，保证后续 `pnpm install`、`pnpm build` 可直接执行
 - 若不存在 `corepack`，回退到 `sudo npm install -g pnpm`
 
-## 4. 错误处理
+## 4. CLI 安装行为
+
+- `openclaw` CLI 包装脚本默认安装到 `${OPENCLAW_DIY_BIN_DIR:-$HOME/.local/bin}`
+- 同时必须额外安装到 `${OPENCLAW_DIY_SYSTEM_BIN_DIR:-/usr/local/bin}`，优先保证常见 shell 默认可发现
+- 若系统目录不可直接写入且存在 `sudo`，脚本必须使用 `sudo install`
+- 若系统目录不可写且无 `sudo`，只告警，不阻断整体安装
+
+## 5. 错误处理
 
 - 缺少关键命令或补丁应用失败时立即退出
 - 目标仓库远端不是官方 `openclaw/openclaw` 时立即退出

@@ -28,6 +28,7 @@
 - `pnpm` 优先通过 `corepack` 启用
 - 当 `corepack` 默认 shim 目录不可写时，脚本必须自动回退到用户目录 `~/.local/bin`
 - 回退到用户目录后，安装流程必须保证当前执行链路内能直接使用 `pnpm`
+- CLI 包装脚本必须额外安装到 `/usr/local/bin/openclaw`，避免依赖用户 shell 是否预先包含 `~/.local/bin`
 - 公开文档必须明确说明用户后续 shell 可能需要把 `~/.local/bin` 加入 `PATH`
 
 ## 5. 非目标
