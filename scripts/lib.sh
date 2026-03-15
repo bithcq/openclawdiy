@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# 功能说明：封装 openclaw-diy 安装/更新流程的共享基础能力。
+# 主要函数职责：负责系统依赖、Node/pnpm、仓库准备、DIY 叠加与本地运行配置。
+# 关键依赖：bash、git、curl、sudo、node、corepack 或 npm。
+
 DIY_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEFAULT_TARGET_DIR="${OPENCLAW_TARGET_DIR:-$HOME/openclaw}"
 OFFICIAL_REMOTE_NAME="${OPENCLAW_OFFICIAL_REMOTE_NAME:-origin}"
@@ -103,8 +107,18 @@ ensure_pnpm() {
   fi
 
   if command -v corepack >/dev/null 2>&1; then
+    local install_dir
+    install_dir="$(dirname "$(command -v corepack)")"
+    if [[ ! -w "$install_dir" ]]; then
+      install_dir="${XDG_BIN_HOME:-$HOME/.local/bin}"
+      mkdir -p "$install_dir"
+      export PATH="$install_dir:$PATH"
+      warn "corepack 默认安装目录不可写，改为用户目录：$install_dir"
+      warn "后续 shell 如果找不到 pnpm，请把 $install_dir 加入 PATH。"
+    fi
+
     info "通过 corepack 启用 pnpm"
-    corepack enable
+    corepack enable pnpm --install-directory "$install_dir"
     corepack prepare pnpm@latest --activate
   else
     info "通过 npm 安装 pnpm"
