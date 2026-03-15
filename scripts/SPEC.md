@@ -21,6 +21,7 @@
 ## 2. 共享库约定
 
 - `lib.sh` 负责系统依赖、Node.js、pnpm、仓库检查、overlay/patch 应用和配置写入
+- `lib.sh` 在入口加载时会自动把 `${XDG_BIN_HOME:-$HOME/.local/bin}` 补到 `PATH`，保证多段脚本链路能复用用户目录下的 `pnpm`
 - 共享函数对外只保证被 scripts 目录下的入口脚本调用，不承诺稳定的外部 API
 
 ## 3. pnpm 安装行为

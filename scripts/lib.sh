@@ -10,6 +10,7 @@ DEFAULT_TARGET_DIR="${OPENCLAW_TARGET_DIR:-$HOME/openclaw}"
 OFFICIAL_REMOTE_NAME="${OPENCLAW_OFFICIAL_REMOTE_NAME:-origin}"
 OFFICIAL_REMOTE_URL="${OPENCLAW_OFFICIAL_REMOTE_URL:-https://github.com/openclaw/openclaw.git}"
 REQUIRED_NODE_MAJOR="${OPENCLAW_DIY_NODE_MAJOR:-22}"
+USER_BIN_DIR="${XDG_BIN_HOME:-$HOME/.local/bin}"
 
 info() {
   printf '[openclaw-diy] %s\n' "$*"
@@ -27,6 +28,14 @@ die() {
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || die "缺少命令：$1"
 }
+
+ensure_user_bin_on_path() {
+  if [[ -d "$USER_BIN_DIR" && ":$PATH:" != *":$USER_BIN_DIR:"* ]]; then
+    export PATH="$USER_BIN_DIR:$PATH"
+  fi
+}
+
+ensure_user_bin_on_path
 
 detect_linux_distro() {
   if [[ -r /etc/os-release ]]; then
@@ -101,6 +110,8 @@ ensure_node_runtime() {
 }
 
 ensure_pnpm() {
+  ensure_user_bin_on_path
+
   if command -v pnpm >/dev/null 2>&1; then
     info "当前 pnpm: $(pnpm -v)"
     return
@@ -110,9 +121,9 @@ ensure_pnpm() {
     local install_dir
     install_dir="$(dirname "$(command -v corepack)")"
     if [[ ! -w "$install_dir" ]]; then
-      install_dir="${XDG_BIN_HOME:-$HOME/.local/bin}"
+      install_dir="$USER_BIN_DIR"
       mkdir -p "$install_dir"
-      export PATH="$install_dir:$PATH"
+      ensure_user_bin_on_path
       warn "corepack 默认安装目录不可写，改为用户目录：$install_dir"
       warn "后续 shell 如果找不到 pnpm，请把 $install_dir 加入 PATH。"
     fi
