@@ -12,6 +12,8 @@
 
 - `PRD.md`
   - 项目目标、安装边界和关键约束
+- `MAINTENANCE.md`
+  - 官方更新导致 DIY 失败时的排查与修复流程
 - `scripts/SPEC.md`
   - 安装脚本入口、共享库行为和 `pnpm` 安装约定
 
