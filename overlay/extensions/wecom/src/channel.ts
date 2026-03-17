@@ -7,11 +7,11 @@
 import {
   buildChannelConfigSchema,
   DEFAULT_ACCOUNT_ID,
-  registerPluginHttpRoute,
   setAccountEnabledInConfigSection,
-  waitUntilAbort,
-  type ChannelPlugin,
-} from "openclaw/plugin-sdk";
+} from "openclaw/plugin-sdk/core";
+import { waitUntilAbort } from "openclaw/plugin-sdk/channel-lifecycle";
+import { registerPluginHttpRoute } from "openclaw/plugin-sdk/synology-chat";
+import type { ChannelPlugin } from "openclaw/plugin-sdk";
 import { z } from "zod";
 import { listWecomAccountIds, resolveWecomAccount } from "./accounts.js";
 import { sendImageMessage, sendTextMessage, uploadMediaFromUrl } from "./client.js";
