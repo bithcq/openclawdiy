@@ -9,9 +9,8 @@ import {
   isRequestBodyLimitError,
   readRequestBodyWithLimit,
   requestBodyErrorToText,
-  type OpenClawConfig,
-  type PluginRuntime,
-} from "openclaw/plugin-sdk";
+} from "openclaw/plugin-sdk/synology-chat";
+import type { OpenClawConfig, PluginRuntime } from "openclaw/plugin-sdk";
 import { resolveWecomAccount } from "./accounts.js";
 import { downloadMediaById, downloadMediaFromUrl, sendTextMessage } from "./client.js";
 import {

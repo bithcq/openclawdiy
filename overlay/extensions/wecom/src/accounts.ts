@@ -4,7 +4,8 @@
  * 关键依赖或环境变量：channels.wecom、WECOM_*。
  */
 
-import { DEFAULT_ACCOUNT_ID, type OpenClawConfig } from "openclaw/plugin-sdk";
+import { DEFAULT_ACCOUNT_ID } from "openclaw/plugin-sdk/core";
+import type { OpenClawConfig } from "openclaw/plugin-sdk";
 import type { ResolvedWecomAccount, WecomAccountRaw, WecomChannelConfig } from "./types.js";
 
 function getChannelConfig(cfg: OpenClawConfig): WecomChannelConfig | undefined {
