@@ -17,10 +17,9 @@
 - `scripts/SPEC.md`
   - 安装脚本入口、共享库行为和 `pnpm` 安装约定
 
-当前 DIY 只保留两类定制：
+当前 DIY 只保留一类定制：
 
 - `extensions/wecom/**`
-- `native web_search` 最小核心补丁
 
 另外，脚本会顺手写入本地运行配置：
 
