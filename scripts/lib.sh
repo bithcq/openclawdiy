@@ -200,11 +200,13 @@ reset_target_to_official_main() {
 
 build_target() {
   local target_dir="$1"
-  # 清除旧 node_modules 防止 pnpm 虚拟 store 损坏导致依赖缺失
+  # 清除旧 node_modules 和修复全局 store，防止损坏的硬链接导致依赖缺失
   info "清理旧依赖"
   rm -rf "$target_dir/node_modules"
+  # 删除 node_modules 后，被损坏的包变成无引用状态，prune 可以从全局 store 中移除它们
+  pnpm store prune 2>/dev/null || true
   info "安装依赖"
-  pnpm -C "$target_dir" install --force
+  pnpm -C "$target_dir" install
   info "构建 Control UI"
   pnpm -C "$target_dir" ui:build
   info "构建 OpenClaw"
