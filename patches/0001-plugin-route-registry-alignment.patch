@@ -1,5 +1,5 @@
 diff --git a/src/gateway/server-channels.test.ts b/src/gateway/server-channels.test.ts
-index 2e886962d..c010503d1 100644
+index 01dd6aa17..8d71de596 100644
 --- a/src/gateway/server-channels.test.ts
 +++ b/src/gateway/server-channels.test.ts
 @@ -5,6 +5,7 @@ import {
@@ -10,7 +10,7 @@ index 2e886962d..c010503d1 100644
  import { createEmptyPluginRegistry, type PluginRegistry } from "../plugins/registry.js";
  import { getActivePluginRegistry, setActivePluginRegistry } from "../plugins/runtime.js";
  import type { PluginRuntime } from "../plugins/runtime/types.js";
-@@ -93,6 +94,7 @@ function createManager(options?: {
+@@ -103,6 +104,7 @@ function createManager(options?: {
    channelRuntime?: PluginRuntime["channel"];
    resolveChannelRuntime?: () => PluginRuntime["channel"];
    loadConfig?: () => Record<string, unknown>;
@@ -18,7 +18,7 @@ index 2e886962d..c010503d1 100644
  }) {
    const log = createSubsystemLogger("gateway/server-channels-test");
    const channelLogs = { discord: log } as Record<ChannelId, SubsystemLogger>;
-@@ -102,6 +104,7 @@ function createManager(options?: {
+@@ -112,6 +114,7 @@ function createManager(options?: {
      loadConfig: () => options?.loadConfig?.() ?? {},
      channelLogs,
      channelRuntimeEnvs,
@@ -26,7 +26,7 @@ index 2e886962d..c010503d1 100644
      ...(options?.channelRuntime ? { channelRuntime: options.channelRuntime } : {}),
      ...(options?.resolveChannelRuntime
        ? { resolveChannelRuntime: options.resolveChannelRuntime }
-@@ -353,4 +356,35 @@ describe("server-channels auto restart", () => {
+@@ -409,4 +412,35 @@ describe("server-channels auto restart", () => {
  
      expect(manager.isHealthMonitorEnabled("discord", "")).toBe(true);
    });
@@ -63,7 +63,7 @@ index 2e886962d..c010503d1 100644
 +  });
  });
 diff --git a/src/gateway/server-channels.ts b/src/gateway/server-channels.ts
-index a016826f6..55ad4e21e 100644
+index 16cad24b0..af13c5285 100644
 --- a/src/gateway/server-channels.ts
 +++ b/src/gateway/server-channels.ts
 @@ -6,6 +6,8 @@ import { type BackoffPolicy, computeBackoff, sleepWithAbort } from "../infra/bac
@@ -75,7 +75,7 @@ index a016826f6..55ad4e21e 100644
  import type { PluginRuntime } from "../plugins/runtime/types.js";
  import { resolveAccountEntry } from "../routing/account-lookup.js";
  import {
-@@ -75,6 +77,15 @@ type ChannelManagerOptions = {
+@@ -77,6 +79,15 @@ type ChannelManagerOptions = {
    loadConfig: () => OpenClawConfig;
    channelLogs: Record<ChannelId, SubsystemLogger>;
    channelRuntimeEnvs: Record<ChannelId, RuntimeEnv>;
@@ -91,7 +91,7 @@ index a016826f6..55ad4e21e 100644
    /**
     * Optional channel runtime helpers for external channel plugins.
     *
-@@ -133,7 +144,7 @@ export type ChannelManager = {
+@@ -135,7 +146,7 @@ export type ChannelManager = {
  
  // Channel docking: lifecycle hooks (`plugin.gateway`) flow through this manager.
  export function createChannelManager(opts: ChannelManagerOptions): ChannelManager {
@@ -100,7 +100,7 @@ index a016826f6..55ad4e21e 100644
      opts;
  
    const channelStores = new Map<ChannelId, ChannelRuntimeStore>();
-@@ -201,6 +212,15 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
+@@ -203,6 +214,15 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
      return true;
    };
  
@@ -116,7 +116,7 @@ index a016826f6..55ad4e21e 100644
    const getStore = (channelId: ChannelId): ChannelRuntimeStore => {
      const existing = channelStores.get(channelId);
      if (existing) {
-@@ -237,6 +257,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
+@@ -239,6 +259,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
      accountId?: string,
      opts: StartChannelOptions = {},
    ) => {
@@ -124,15 +124,15 @@ index a016826f6..55ad4e21e 100644
      const plugin = getChannelPlugin(channelId);
      const startAccount = plugin?.gateway?.startAccount;
      if (!startAccount) {
-@@ -293,6 +314,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
-           manuallyStopped.delete(rKey);
-         }
+@@ -272,6 +293,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
  
+         // Reserve the account before the first await so overlapping start calls
+         // cannot race into duplicate provider boots for the same account.
 +        ensureCanonicalPluginRegistry();
          const abort = new AbortController();
          store.aborts.set(id, abort);
-         if (!preserveRestartAttempts) {
-@@ -392,10 +414,12 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
+         let handedOffTask = false;
+@@ -431,10 +453,12 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
    };
  
    const startChannel = async (channelId: ChannelId, accountId?: string) => {
@@ -145,7 +145,7 @@ index a016826f6..55ad4e21e 100644
      const plugin = getChannelPlugin(channelId);
      const store = getStore(channelId);
      // Fast path: nothing running and no explicit plugin shutdown hook to run.
-@@ -423,6 +447,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
+@@ -463,6 +487,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
          manuallyStopped.add(restartKey(channelId, id));
          abort?.abort();
          if (plugin?.gateway?.stopAccount) {
@@ -153,7 +153,7 @@ index a016826f6..55ad4e21e 100644
            const account = plugin.config.resolveAccount(cfg, id);
            await plugin.gateway.stopAccount({
              cfg,
-@@ -453,6 +478,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
+@@ -493,6 +518,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
    };
  
    const startChannels = async () => {
@@ -161,7 +161,7 @@ index a016826f6..55ad4e21e 100644
      for (const plugin of listChannelPlugins()) {
        await startChannel(plugin.id);
      }
-@@ -484,6 +510,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
+@@ -524,6 +550,7 @@ export function createChannelManager(opts: ChannelManagerOptions): ChannelManage
    };
  
    const getRuntimeSnapshot = (): ChannelRuntimeSnapshot => {
