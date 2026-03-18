@@ -200,6 +200,9 @@ reset_target_to_official_main() {
 
 build_target() {
   local target_dir="$1"
+  # 清除旧 node_modules 防止 pnpm 虚拟 store 损坏导致依赖缺失
+  info "清理旧依赖"
+  rm -rf "$target_dir/node_modules"
   info "安装依赖"
   pnpm -C "$target_dir" install --force
   info "构建 Control UI"
