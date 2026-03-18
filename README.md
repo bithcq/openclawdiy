@@ -4,8 +4,8 @@
 
 目标：
 
-- 底座始终使用官方 `openclaw/openclaw`
-- 只维护自己的定制能力
+- 底座始终使用官方 `openclaw/openclaw`，仓库保持干净
+- WeCom 作为外部插件独立维护，通过 `plugins install --link` 注册
 - 官方更新后，重新跑一次脚本即可重新套用定制
 
 文档导航：
@@ -28,22 +28,37 @@
 - `session.dmScope=main`
 - `tools.profile=full`
 - `tools.exec.applyPatch.enabled=true`
-- `plugins.entries.wecom.enabled=true`
 - `channels.wecom.dmPolicy=open`
 - `channels.wecom.allowFrom=["*"]`
 
+## 架构说明
+
+```
+openclawdiy/              ← DIY 仓库（本仓库）
+├── extensions/wecom/     ← WeCom 外部插件（独立依赖、独立维护）
+├── scripts/              ← 安装/更新脚本
+└── templates/            ← 环境变量模板
+
+~/openclaw/               ← 官方仓库（保持干净，可自由 git pull）
+```
+
+安装流程：
+1. 重置官方仓库到最新 `origin/main`
+2. 构建官方代码（`pnpm install` + `pnpm build`）
+3. 在 WeCom 插件目录执行 `pnpm install` 安装独立依赖
+4. 通过 `plugins install --link` 将 WeCom 注册为外部插件
+5. 写入本地运行配置
+
 ## 目录说明
 
-- `overlay/`
-  - 直接覆盖到官方仓库里的文件
-- `patches/`
-  - 对官方核心文件的最小补丁
+- `extensions/wecom/`
+  - WeCom 外部插件，通过 `--link` 注册到官方仓库，jiti 运行时编译 TypeScript
 - `scripts/install-diy.sh`
   - 首次安装官方仓库并套用 DIY
 - `scripts/update-diy.sh`
   - 更新官方仓库后重新套用 DIY
 - `scripts/apply-diy.sh`
-  - 只负责把 overlay + patch + 本地配置应用到目标仓库
+  - 只负责构建官方代码、注册外部插件和写入本地配置
 
 ## 用法
 
@@ -62,7 +77,7 @@
 
 - 新电脑
 - 还没安装 OpenClaw
-- 想一条命令完成“官方底座 + DIY”
+- 想一条命令完成"官方底座 + DIY"
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/bithcq/openclawdiy/main/install-new.sh)
@@ -137,11 +152,11 @@ bash diy/install-diy.sh
 bash diy/update.sh
 ```
 
-脚本默认把目标官方仓库当作“可重建目录”处理：
+脚本默认把目标官方仓库当作"可重建目录"处理：
 
 - 会先 `fetch + reset --hard` 到官方最新 `main`
-- 再清理旧的 DIY 叠加文件
-- 最后重新套用 overlay、patch 和本地配置
+- 构建官方代码
+- 注册 WeCom 外部插件并写入本地配置
 
 所以目标目录里不要放手工长期维护的改动。
 
@@ -190,9 +205,10 @@ WeCom 语音转写现在支持两条路径：
 - 优先使用 `ffmpeg-static`
 - 如果 `ffmpeg-static` 因为 `pnpm` 跳过 build scripts 没拉到二进制，会自动回退到系统 `ffmpeg`
 
-DIY 安装脚本默认会尝试安装系统 `ffmpeg`。如果你首次安装后语音仍不可用，优先在目标官方仓库里执行：
+DIY 安装脚本默认会尝试安装系统 `ffmpeg`。如果你首次安装后语音仍不可用，优先在 WeCom 插件目录执行：
 
 ```bash
+cd ~/openclawdiy/extensions/wecom
 pnpm approve-builds
 pnpm install
 ```
@@ -205,7 +221,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 ## 约束
 
-- 目标官方仓库默认被视为“生成产物目录”，不要在里面做人工长期开发。
+- 目标官方仓库默认被视为"生成产物目录"，不要在里面做人工长期开发。
 - 更新脚本会把目标仓库重置到官方最新 `origin/main` 后再重新套用 DIY。
-- 如果官方更新导致 patch 无法应用，脚本会直接失败；这时只需要更新 `patches/*` 或 `overlay/*`。
-- 当前脚本会额外写入本地运行配置，所以它既负责“套代码”，也负责“把这台机器配置成可运行的 DIY 版本”。
+- 官方仓库保持干净，WeCom 作为外部插件独立运行，官方更新不影响 DIY。
+- 当前脚本会额外写入本地运行配置，所以它既负责"套代码"，也负责"把这台机器配置成可运行的 DIY 版本"。

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # 功能说明：封装 openclaw-diy 安装/更新流程的共享基础能力。
-# 主要函数职责：负责系统依赖、Node/pnpm、仓库准备、DIY 叠加与本地运行配置。
+# 主要函数职责：负责系统依赖、Node/pnpm、仓库准备、外部插件注册与本地运行配置。
 # 关键依赖：bash、git、curl、sudo、node、corepack 或 npm。
 
 DIY_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -176,31 +176,18 @@ prepare_target_repo() {
   fi
 }
 
-remove_previous_overlay_paths() {
-  local target_dir="$1"
-  while IFS= read -r src; do
-    local rel="${src#"$DIY_ROOT/overlay/"}"
-    rm -f "$target_dir/$rel"
-  done < <(find "$DIY_ROOT/overlay" -type f | sort)
+install_wecom_deps() {
+  local wecom_dir="$DIY_ROOT/extensions/wecom"
+  [[ -d "$wecom_dir" ]] || die "WeCom 插件目录不存在：$wecom_dir"
+  info "安装 WeCom 插件依赖"
+  pnpm -C "$wecom_dir" install
 }
 
-copy_overlay() {
+link_wecom_plugin() {
   local target_dir="$1"
-  while IFS= read -r src; do
-    local rel="${src#"$DIY_ROOT/overlay/"}"
-    mkdir -p "$(dirname "$target_dir/$rel")"
-    cp "$src" "$target_dir/$rel"
-  done < <(find "$DIY_ROOT/overlay" -type f | sort)
-}
-
-apply_patch_set() {
-  local target_dir="$1"
-  local patch
-  for patch in "$DIY_ROOT"/patches/*.patch; do
-    [[ -f "$patch" ]] || continue
-    info "应用补丁 $(basename "$patch")"
-    git -C "$target_dir" apply --3way "$patch" || die "补丁失败：$(basename "$patch")。说明官方更新影响了 DIY，需要更新 patch。"
-  done
+  local wecom_dir="$DIY_ROOT/extensions/wecom"
+  info "注册 WeCom 外部插件"
+  run_claw "$target_dir" plugins install --link "$wecom_dir"
 }
 
 reset_target_to_official_main() {
@@ -222,18 +209,18 @@ build_target() {
 }
 
 warn_if_wecom_voice_deps_missing() {
-  local target_dir="$1"
   # WeCom 语音转写允许两条路径：
   # 1. ffmpeg-static 二进制存在且可执行
   # 2. 系统 ffmpeg 在 PATH 中可用
   # 只要满足其中一条，就不再报警。
+  local wecom_dir="$DIY_ROOT/extensions/wecom"
   if command -v ffmpeg >/dev/null 2>&1; then
     info "检测到系统 ffmpeg：$(command -v ffmpeg)"
     return
   fi
 
   if (
-    cd "$target_dir/extensions/wecom" &&
+    cd "$wecom_dir" &&
       node --input-type=module -e 'import fs from "node:fs"; import ffmpegPath from "ffmpeg-static"; process.exit(typeof ffmpegPath === "string" && fs.existsSync(ffmpegPath) ? 0 : 1)'
   ); then
     info "检测到 ffmpeg-static 二进制"
@@ -241,7 +228,7 @@ warn_if_wecom_voice_deps_missing() {
   fi
 
   warn "未检测到可用的 ffmpeg；WeCom 语音转写会失败。"
-  warn "如果是 pnpm 跳过 build scripts，请在目标仓库执行：pnpm approve-builds，并允许 ffmpeg-static。"
+  warn "如果是 pnpm 跳过 build scripts，请在 WeCom 插件目录执行：pnpm approve-builds，并允许 ffmpeg-static。"
   warn "或者直接安装系统 ffmpeg（DIY 脚本默认会尝试安装）。"
 }
 
@@ -388,7 +375,6 @@ configure_target_runtime() {
   run_claw "$target_dir" config set session.dmScope main
   run_claw "$target_dir" config set tools.profile full
   run_claw "$target_dir" config set tools.exec.applyPatch.enabled true
-  run_claw "$target_dir" config set plugins.entries.wecom.enabled true
   run_claw "$target_dir" config set channels.wecom.dmPolicy open
   run_claw "$target_dir" config set channels.wecom.allowFrom '["*"]' --strict-json
 }

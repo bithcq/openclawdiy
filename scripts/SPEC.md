@@ -12,19 +12,29 @@
 - `install-openclaw-base.sh`
   - 只负责准备官方 OpenClaw Git 底座和依赖
 - `install-diy.sh`
-  - 只负责叠加 overlay、patch 与本地运行配置
+  - 只负责构建官方代码、注册 WeCom 外部插件与写入本地运行配置
 - `update-diy.sh`
   - 在已有官方仓库上拉取官方最新后重新套用 DIY
 - `apply-diy.sh`
-  - 仅执行 overlay、patch 和配置写入，不负责拉取官方代码
+  - 仅执行官方代码构建、外部插件注册和配置写入，不负责拉取官方代码
 
 ## 2. 共享库约定
 
-- `lib.sh` 负责系统依赖、Node.js、pnpm、仓库检查、overlay/patch 应用和配置写入
+- `lib.sh` 负责系统依赖、Node.js、pnpm、仓库检查、外部插件注册和配置写入
 - `lib.sh` 在入口加载时会自动把 `${XDG_BIN_HOME:-$HOME/.local/bin}` 补到 `PATH`，保证多段脚本链路能复用用户目录下的 `pnpm`
 - 共享函数对外只保证被 scripts 目录下的入口脚本调用，不承诺稳定的外部 API
 
-## 3. pnpm 安装行为
+## 3. 核心流程
+
+`apply-diy.sh` 的执行顺序：
+
+1. `reset_target_to_official_main` — 重置到官方最新
+2. `build_target` — 构建官方代码（`pnpm install` + `pnpm build`）
+3. `install_wecom_deps` — 在 WeCom 插件目录执行 `pnpm install`
+4. `link_wecom_plugin` — 调用 `plugins install --link` 注册外部插件
+5. `configure_target_runtime` — 写入本地运行配置
+
+## 4. pnpm 安装行为
 
 - 若系统已存在 `pnpm`，直接复用
 - 若存在 `corepack`，默认在 `corepack` 同目录启用 `pnpm` shim
@@ -32,15 +42,16 @@
 - 回退时必须在当前脚本进程内补 `PATH`，保证后续 `pnpm install`、`pnpm build` 可直接执行
 - 若不存在 `corepack`，回退到 `sudo npm install -g pnpm`
 
-## 4. CLI 安装行为
+## 5. CLI 安装行为
 
 - `openclaw` CLI 包装脚本默认安装到 `${OPENCLAW_DIY_BIN_DIR:-$HOME/.local/bin}`
 - 同时必须额外安装到 `${OPENCLAW_DIY_SYSTEM_BIN_DIR:-/usr/local/bin}`，优先保证常见 shell 默认可发现
 - 若系统目录不可直接写入且存在 `sudo`，脚本必须使用 `sudo install`
 - 若系统目录不可写且无 `sudo`，只告警，不阻断整体安装
 
-## 5. 错误处理
+## 6. 错误处理
 
-- 缺少关键命令或补丁应用失败时立即退出
+- 缺少关键命令时立即退出
 - 目标仓库远端不是官方 `openclaw/openclaw` 时立即退出
 - 目标仓库存在本地改动时只告警，不阻断后续重建流程
+- WeCom 插件目录不存在时立即退出
