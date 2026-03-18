@@ -184,12 +184,18 @@ install_wecom_deps() {
 }
 
 clean_stale_wecom_config() {
-  # 从 overlay 模式迁移到外部插件时，config 中可能残留旧的 wecom 条目，
+  # 从 overlay 模式迁移到外部插件时，config 中可能残留旧的 wecom 条目
+  # （有 channels.wecom 但 plugins.entries.wecom 指向旧的内置路径或缺失），
   # 导致 openclaw CLI 因 config invalid 拒绝执行任何命令。
-  # 在注册插件前清理这些条目。
+  # 仅在检测到残留条目时清理，已正常注册的环境不受影响。
   local config_path
   config_path="$(resolve_config_path)"
   [[ -f "$config_path" ]] || return 0
+
+  # 尝试运行 CLI 检测 config 是否有效；有效则跳过清理
+  if run_claw "$1" status --all >/dev/null 2>&1; then
+    return 0
+  fi
 
   if python3 -c "
 import json, sys
@@ -215,7 +221,7 @@ sys.exit(1)
 link_wecom_plugin() {
   local target_dir="$1"
   local wecom_dir="$DIY_ROOT/extensions/wecom"
-  clean_stale_wecom_config
+  clean_stale_wecom_config "$target_dir"
   info "注册 WeCom 外部插件"
   run_claw "$target_dir" plugins install --link "$wecom_dir"
 }
