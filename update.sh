@@ -20,7 +20,8 @@ require_cmd git
 
 if [[ -d "$DIY_DIR/.git" ]]; then
   info "更新 openclawdiy 仓库"
-  git -C "$DIY_DIR" pull --ff-only origin main
+  git -C "$DIY_DIR" fetch origin main
+  git -C "$DIY_DIR" reset --hard origin/main
 elif [[ -e "$DIY_DIR" ]]; then
   echo "[openclaw-diy] ERROR: 目标目录已存在且不是 git 仓库：$DIY_DIR" >&2
   exit 1
