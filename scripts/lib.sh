@@ -201,7 +201,7 @@ reset_target_to_official_main() {
 build_target() {
   local target_dir="$1"
   info "安装依赖"
-  pnpm -C "$target_dir" install --no-frozen-lockfile
+  pnpm -C "$target_dir" install --force
   info "构建 Control UI"
   pnpm -C "$target_dir" ui:build
   info "构建 OpenClaw"
