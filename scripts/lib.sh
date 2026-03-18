@@ -183,9 +183,39 @@ install_wecom_deps() {
   pnpm -C "$wecom_dir" install
 }
 
+clean_stale_wecom_config() {
+  # 从 overlay 模式迁移到外部插件时，config 中可能残留旧的 wecom 条目，
+  # 导致 openclaw CLI 因 config invalid 拒绝执行任何命令。
+  # 在注册插件前清理这些条目。
+  local config_path
+  config_path="$(resolve_config_path)"
+  [[ -f "$config_path" ]] || return 0
+
+  if python3 -c "
+import json, sys
+with open('$config_path') as f:
+    c = json.load(f)
+changed = False
+ch = c.get('channels', {})
+if 'wecom' in ch:
+    del ch['wecom']; changed = True
+pe = c.get('plugins', {}).get('entries', {})
+if 'wecom' in pe:
+    del pe['wecom']; changed = True
+if changed:
+    with open('$config_path', 'w') as f:
+        json.dump(c, f, indent=2)
+    sys.exit(0)
+sys.exit(1)
+" 2>/dev/null; then
+    info "已清理旧的 wecom 配置条目"
+  fi
+}
+
 link_wecom_plugin() {
   local target_dir="$1"
   local wecom_dir="$DIY_ROOT/extensions/wecom"
+  clean_stale_wecom_config
   info "注册 WeCom 外部插件"
   run_claw "$target_dir" plugins install --link "$wecom_dir"
 }
@@ -200,11 +230,14 @@ reset_target_to_official_main() {
 
 build_target() {
   local target_dir="$1"
-  # 清除旧 node_modules 和修复全局 store，防止损坏的硬链接导致依赖缺失
-  info "清理旧依赖"
-  rm -rf "$target_dir/node_modules"
-  # 删除 node_modules 后，被损坏的包变成无引用状态，prune 可以从全局 store 中移除它们
-  pnpm store prune 2>/dev/null || true
+  # 旧 overlay 模式可能污染 pnpm 全局 store 的硬链接，
+  # 导致 tsdown --clean 清理 dist/ 时通过异常硬链接连带清空 node_modules 中的包。
+  # 清除 node_modules 使损坏的包变成无引用状态，prune 从全局 store 中移除它们。
+  if pnpm store status 2>&1 | grep -q 'MODIFIED_DEPENDENCY'; then
+    warn "检测到 pnpm store 损坏，清理后重新安装"
+    rm -rf "$target_dir/node_modules"
+    pnpm store prune 2>/dev/null || true
+  fi
   info "安装依赖"
   pnpm -C "$target_dir" install
   info "构建 Control UI"
