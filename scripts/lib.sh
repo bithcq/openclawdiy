@@ -230,20 +230,16 @@ reset_target_to_official_main() {
 
 build_target() {
   local target_dir="$1"
-  # 旧 overlay 模式可能污染 pnpm 全局 store 的硬链接，
-  # 导致 tsdown --clean 清理 dist/ 时通过异常硬链接连带清空 node_modules 中的包。
-  # 清除 node_modules 使损坏的包变成无引用状态，prune 从全局 store 中移除它们。
-  if pnpm store status 2>&1 | grep -q 'MODIFIED_DEPENDENCY'; then
-    warn "检测到 pnpm store 损坏，清理后重新安装"
-    rm -rf "$target_dir/node_modules"
-    pnpm store prune 2>/dev/null || true
-  fi
   info "安装依赖"
   pnpm -C "$target_dir" install
   info "构建 Control UI"
   pnpm -C "$target_dir" ui:build
   info "构建 OpenClaw"
   pnpm -C "$target_dir" build
+  # pnpm 使用硬链接共享文件，tsdown --clean 清理 dist/ 时会通过共享 inode
+  # 连带删除 node_modules 中的包文件。构建后需要 --force 重新链接。
+  info "修复构建后依赖"
+  pnpm -C "$target_dir" install --force
 }
 
 warn_if_wecom_voice_deps_missing() {
