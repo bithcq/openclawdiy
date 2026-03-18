@@ -25,7 +25,7 @@
 ## 4. 安装行为约束
 
 - 默认把目标官方仓库视为可重建目录，更新时允许覆盖
-- 官方仓库保持干净（`git status` clean），不注入 overlay 或 patch
+- 官方仓库保持干净（`git status` clean），所有定制通过外部插件实现
 - WeCom 插件通过 `plugins install --link` 注册，依赖由自身 `pnpm install` 解析
 - `pnpm` 优先通过 `corepack` 启用
 - 当 `corepack` 默认 shim 目录不可写时，脚本必须自动回退到用户目录 `~/.local/bin`

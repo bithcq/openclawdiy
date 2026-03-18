@@ -17,8 +17,6 @@ require_cmd() {
 }
 
 require_cmd git
-require_cmd node
-require_cmd pnpm
 
 if [[ -d "$DIY_DIR/.git" ]]; then
   info "更新 openclawdiy 仓库"
