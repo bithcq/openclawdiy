@@ -222,6 +222,10 @@ link_wecom_plugin() {
   local target_dir="$1"
   local wecom_dir="$DIY_ROOT/extensions/wecom"
   clean_stale_wecom_config "$target_dir"
+  # 外部插件从自身目录解析模块，需要能找到 openclaw/plugin-sdk。
+  # 创建符号链接让 Node.js 模块解析从 wecom/node_modules/openclaw 指向官方仓库。
+  mkdir -p "$wecom_dir/node_modules"
+  ln -sfn "$target_dir" "$wecom_dir/node_modules/openclaw"
   info "注册 WeCom 外部插件"
   run_claw "$target_dir" plugins install --link "$wecom_dir"
 }
