@@ -54,10 +54,10 @@ grep -rn 'export.*buildChannelConfigSchema' src/plugin-sdk/
 | `DEFAULT_ACCOUNT_ID` | `openclaw/plugin-sdk/core` |
 | `setAccountEnabledInConfigSection` | `openclaw/plugin-sdk/core` |
 | `waitUntilAbort` | `openclaw/plugin-sdk/channel-lifecycle` |
-| `registerPluginHttpRoute` | `openclaw/plugin-sdk/synology-chat` |
-| `isRequestBodyLimitError` | `openclaw/plugin-sdk/synology-chat` |
-| `readRequestBodyWithLimit` | `openclaw/plugin-sdk/synology-chat` |
-| `requestBodyErrorToText` | `openclaw/plugin-sdk/synology-chat` |
+| `registerPluginHttpRoute` | `openclaw/plugin-sdk/webhook-ingress` |
+| `isRequestBodyLimitError` | `openclaw/plugin-sdk/webhook-ingress` |
+| `readRequestBodyWithLimit` | `openclaw/plugin-sdk/webhook-ingress` |
+| `requestBodyErrorToText` | `openclaw/plugin-sdk/webhook-ingress` |
 | `emptyPluginConfigSchema` | `openclaw/plugin-sdk`（根入口） |
 | `type ChannelPlugin` | `openclaw/plugin-sdk`（根入口） |
 | `type OpenClawConfig` | `openclaw/plugin-sdk`（根入口） |

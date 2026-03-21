@@ -10,7 +10,7 @@ import {
   setAccountEnabledInConfigSection,
 } from "openclaw/plugin-sdk/core";
 import { waitUntilAbort } from "openclaw/plugin-sdk/channel-lifecycle";
-import { registerPluginHttpRoute } from "openclaw/plugin-sdk/synology-chat";
+import { registerPluginHttpRoute } from "openclaw/plugin-sdk/webhook-ingress";
 import type { ChannelPlugin } from "openclaw/plugin-sdk";
 import { z } from "zod";
 import { listWecomAccountIds, resolveWecomAccount } from "./accounts.js";

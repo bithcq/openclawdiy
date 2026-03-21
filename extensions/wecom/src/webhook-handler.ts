@@ -9,7 +9,7 @@ import {
   isRequestBodyLimitError,
   readRequestBodyWithLimit,
   requestBodyErrorToText,
-} from "openclaw/plugin-sdk/synology-chat";
+} from "openclaw/plugin-sdk/webhook-ingress";
 import type { OpenClawConfig, PluginRuntime } from "openclaw/plugin-sdk";
 import { resolveWecomAccount } from "./accounts.js";
 import { downloadMediaById, downloadMediaFromUrl, sendTextMessage } from "./client.js";
