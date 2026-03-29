@@ -238,8 +238,27 @@ reset_target_to_official_main() {
   git -C "$target_dir" clean -fd
 }
 
+patch_upstream_bugs() {
+  local target_dir="$1"
+  # 上游 bug：src/config/io.ts 中 sourceConfig 属性重复定义，导致 tsc 报错。
+  # 等上游修复后可删除此函数。
+  local io_file="$target_dir/src/config/io.ts"
+  if [[ -f "$io_file" ]] && grep -q 'sourceConfig: coerceConfig(parsedRes.parsed),' "$io_file" 2>/dev/null; then
+    local count
+    count="$(grep -c 'sourceConfig: coerceConfig(parsedRes.parsed),' "$io_file")"
+    if [[ "$count" -gt 0 ]]; then
+      # 检查下一行是否也是 sourceConfig（重复定义）
+      if awk '/sourceConfig: coerceConfig\(parsedRes\.parsed\),/{found=NR; next} found && NR==found+2 && /sourceConfig:/{print "dup"; exit}' "$io_file" | grep -q 'dup'; then
+        sed -i '/sourceConfig: coerceConfig(parsedRes\.parsed),/d' "$io_file"
+        info "已修复上游 sourceConfig 重复定义 bug"
+      fi
+    fi
+  fi
+}
+
 build_target() {
   local target_dir="$1"
+  patch_upstream_bugs "$target_dir"
   info "安装依赖"
   pnpm -C "$target_dir" install --no-frozen-lockfile
   info "构建 Control UI"
